@@ -1,0 +1,23 @@
+{
+  "name": "cloudcost",
+  "private": true,
+  "description": "Multi-tenant AWS cost visibility SaaS — weekly spend by project, trends, anomaly flags and email digests.",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "npm run infra:up && concurrently -n api,worker,web -c blue,magenta,green \"npm run dev -w @cloudcost/api\" \"npm run dev:worker -w @cloudcost/api\" \"npm run dev -w @cloudcost/web\"",
+    "infra:up": "docker compose up -d postgres redis mailpit",
+    "infra:down": "docker compose down",
+    "db:migrate": "npm run db:migrate -w @cloudcost/api",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test -w @cloudcost/api",
+    "test:e2e": "npm run test:e2e -w @cloudcost/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20.9"
+  }
+}

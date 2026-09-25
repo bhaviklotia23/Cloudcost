@@ -1,0 +1,70 @@
+# Local development infrastructure.
+#   docker compose up -d                 -> Postgres, Redis, Mailpit (run api/web with npm)
+#   docker compose --profile app up -d   -> also runs api, worker and web in containers
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cloudcost
+      POSTGRES_PASSWORD: cloudcost
+      POSTGRES_DB: cloudcost
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudcost"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  # Catches every outgoing email locally — open http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
+
+  api:
+    profiles: [app]
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["sh", "-c", "node dist/db/migrate.js && node dist/main.js"]
+    env_file: apps/api/.env.example
+    environment:
+      DATABASE_URL: postgres://cloudcost:cloudcost@postgres:5432/cloudcost
+      REDIS_URL: redis://redis:6379
+      SMTP_URL: smtp://mailpit:1025
+    ports: ["4000:4000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    profiles: [app]
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["node", "dist/worker.js"]
+    env_file: apps/api/.env.example
+    environment:
+      DATABASE_URL: postgres://cloudcost:cloudcost@postgres:5432/cloudcost
+      REDIS_URL: redis://redis:6379
+      SMTP_URL: smtp://mailpit:1025
+    depends_on:
+      api: { condition: service_started }
+
+  web:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:4000
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:

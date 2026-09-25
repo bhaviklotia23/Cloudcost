@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Read-only IAM role that lets CloudCost read Cost Explorer data for this account.
+Parameters:
+  CloudCostPrincipalArn:
+    Type: String
+    Default: arn:aws:iam::111122223333:role/cloudcost-app
+    Description: The CloudCost IAM principal allowed to assume this role.
+  ExternalId:
+    Type: String
+    Default: REPLACE-WITH-EXTERNAL-ID-FROM-CLOUDCOST
+    NoEcho: true
+    Description: Unique ID CloudCost generated for this connection. Do not change it.
+  RoleName:
+    Type: String
+    Default: CloudCostReadOnly
+Resources:
+  CloudCostRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref CloudCostPrincipalArn
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: CloudCostReadOnlyCostExplorer
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ce:GetCostAndUsage
+                  - ce:GetDimensionValues
+                  - ce:GetTags
+                Resource: '*'
+Outputs:
+  RoleArn:
+    Description: Paste this into CloudCost to finish connecting.
+    Value: !GetAtt CloudCostRole.Arn
